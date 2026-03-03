@@ -1,0 +1,13 @@
+# Observability Dependencies
+openai>=1.3.0
+langfuse>=2.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Data Analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Monitoring & Logging
+structlog>=23.2.0
+rich>=13.0.0
