@@ -1,0 +1,42 @@
+# Environment files with API keys - DO NOT COMMIT
+.env
+.env.observability
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Data files
+*.csv
+*.json
+!requirements*.txt
+
+# Output files
+improvement_report_*.json
+continuous_optimization_state.json
+continuous_optimization_sequences.csv
