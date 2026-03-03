@@ -1,0 +1,43 @@
+{
+  "2026-03-03": {
+    "date": "2026-03-03",
+    "total_sequences": 100,
+    "score_stats": {
+      "mean": 1.05186,
+      "max": 1.334,
+      "min": 0.843,
+      "top_10_mean": 1.2731
+    },
+    "length_stats": {
+      "mean": 65.36,
+      "range": "40-90"
+    },
+    "top_sequences": [
+      [
+        "RBX1_Binder_002_helical",
+        "MYDKYLRNWYRLWWKANDLLQNIDDFWESMQSAVDSVTTFWTKVRKWFWYFQEWINSVTRAITSMW",
+        1.334
+      ],
+      [
+        "RBX1_Binder_070_helical",
+        "MAFEFWSKWWRYAQQIQNWYHQVWNFYHTWWTVYFEAHKFWNELDQIWWQIEQM",
+        1.304
+      ],
+      [
+        "RBX1_Binder_030_helical",
+        "MVSKWFWGFSRVYQKYNSVAKNFFSVLSRYNKYYYRWESIMSSMWRMLSNWFKWWNSYDNLWNDID",
+        1.293
+      ],
+      [
+        "RBX1_Binder_054_helical",
+        "MAHTAIFRMHEIMKTFKKVFEEMYSYWDDWWKLIYSYHTFWETWGFALWELTDMLNRLS",
+        1.281
+      ],
+      [
+        "RBX1_Binder_011_helical",
+        "MLWSIYTSIWDLAWGFTTLFEEMHQILNTAFKFWTTVWSVVNQFDSYWESYFDALYTFKQMYQTIRKVVEQWQTVASR",
+        1.267
+      ]
+    ]
+  }
+}

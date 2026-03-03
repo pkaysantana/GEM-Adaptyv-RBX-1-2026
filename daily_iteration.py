@@ -177,8 +177,8 @@ def run_daily_check():
         print(f"   {suggestion}")
 
     # Save daily report
-    report_file = f"daily_report_{performance['date']}.md"
-    with open(report_file, 'w') as f:
+    report_file = f"daily_logs/daily_report_{performance['date']}.md"
+    with open(report_file, 'w', encoding='utf-8') as f:
         f.write(f"# Daily Report - {performance['date']}\n\n")
         f.write(report)
         f.write(f"\n\n## Timeline\n")
