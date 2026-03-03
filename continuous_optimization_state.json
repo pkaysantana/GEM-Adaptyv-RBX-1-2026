@@ -1,0 +1,37 @@
+{
+  "analysis": {
+    "timestamp": "2026-03-03T11:28:17.390009",
+    "portfolio_size": 100,
+    "best_score": 1.0,
+    "mean_score": 0.7290821643101003,
+    "score_std": 0.1279286255402902,
+    "method_performance": {
+      "enhanced_v2": {
+        "count": 44,
+        "mean_score": 0.7787772926372646,
+        "best_score": 1.0,
+        "top_10_representation": 10
+      },
+      "docking_v1": {
+        "count": 5,
+        "mean_score": 0.616975697812453,
+        "best_score": 0.898523624512459,
+        "top_10_representation": 5
+      },
+      "ultra_v3": {
+        "count": 51,
+        "mean_score": 0.6971987659981986,
+        "best_score": 0.8635967291965412,
+        "top_10_representation": 10
+      }
+    },
+    "optimization_targets": [
+      "Increase aromatic content to 32%+",
+      "Improve docking_v1 scoring"
+    ],
+    "top_performers": {
+      "mean_length": 65.8,
+      "mean_aromatic": 0.3056749269411436,
+      "dominant_method": "enhanced_v2",
+      "length_range": [
+        
