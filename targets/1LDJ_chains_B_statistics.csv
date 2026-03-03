@@ -1,0 +1,15 @@
+Metric,Value
+Generated,2026-03-03 01:28:14
+Original Chains,"A,B"
+Kept Chains,B
+Removed Chains,A
+Total Atoms Kept,734
+Total HETATM Records Kept,3
+Models Processed,1
+Cofactors Preserved,0
+Atom Serial Renumbering,False
+Residue Renumbering,False
+Alternative Location Policy,keep-all
+Insertion Codes Found,None
+Alternative Locations Found,None
+Validation Warnings,None
