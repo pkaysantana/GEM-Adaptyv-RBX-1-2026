@@ -1,0 +1,34 @@
+GEM-ADAPTYV RBX-1 FINAL SUBMISSION REPORT
+==================================================
+
+PORTFOLIO OVERVIEW
+--------------------
+Total sequences: 100
+Length range: 50-83 AA
+Mean length: 65.7 AA
+Mean aromatic content: 0.301
+Mean experimental success: 0.843
+Best experimental success: 0.965
+Mean competition score: 0.758
+Best competition score: 0.823
+
+VALIDATION STATUS
+------------------
+Format validation: PASS
+Sequence validation: PASS
+Quality validation: PASS
+
+TOP 10 CANDIDATES
+------------------
+   1. RBX1_Enhanced_v2_019_arom      Score: 0.823 Exp: 0.965 Len: 64
+   2. RBX1_Enhanced_v2_009_arom      Score: 0.823 Exp: 0.955 Len: 69
+   3. RBX1_Enhanced_v2_002_comp      Score: 0.814 Exp: 0.952 Len: 62
+   4. RBX1_Ultra_v3_001_alph         Score: 0.807 Exp: 0.896 Len: 66
+   5. RBX1_Ultra_v3_026_beta         Score: 0.804 Exp: 0.889 Len: 70
+   6. RBX1_Docking_v1_019            Score: 0.803 Exp: 0.937 Len: 60
+   7. RBX1_Enhanced_v2_032_arom      Score: 0.802 Exp: 0.920 Len: 69
+   8. RBX1_Ultra_v3_003_alph         Score: 0.799 Exp: 0.895 Len: 67
+   9. RBX1_Ultra_v3_038_loop         Score: 0.798 Exp: 0.874 Len: 52
+  10. RBX1_Enhanced_v2_034_arom      Score: 0.792 Exp: 0.915 Len: 69
+
+SUBMISSION READY FOR GEM-ADAPTYV RBX-1 COMPETITION
