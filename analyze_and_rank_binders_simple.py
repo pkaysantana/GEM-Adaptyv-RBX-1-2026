@@ -395,5 +395,5 @@ if __name__ == "__main__":
     for scaffold, count in scaffold_counts.items():
         print(f"  {scaffold}: {count}")
 
-    print(f"\n✅ Ready for competition submission!")
-    print(f"\n🎯 Next step: Upload {submission_csv} to the competition portal")
+    print(f"\n[READY] Competition submission prepared!")
+    print(f"\n[NEXT] Upload {submission_csv} to the competition portal")
