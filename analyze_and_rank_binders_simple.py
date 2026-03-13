@@ -5,17 +5,46 @@ Simple version without numpy/pandas dependencies
 """
 
 import csv
+import glob
 import math
+import os
 import re
 from typing import List, Dict, Tuple
 
-def load_sequences(csv_file: str) -> List[Tuple[str, str]]:
-    """Load sequences from CSV file"""
-    sequences = []
-    with open(csv_file, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            sequences.append((row['Name'], row['Sequence']))
+# Output files produced by this script — never treated as sources
+_OUTPUT_FILES = {
+    'final_rbx1_submission.csv',
+    'final_rbx1_submission_competition.csv',
+}
+
+def load_sequences(csv_file: str = None) -> List[Tuple[str, str]]:
+    """Load and deduplicate sequences from all rbx1_*.csv source files."""
+    if csv_file:
+        # Legacy single-file path (kept for compatibility)
+        source_files = [csv_file]
+    else:
+        source_files = [
+            f for f in glob.glob('rbx1_*.csv')
+            if os.path.basename(f) not in _OUTPUT_FILES
+        ]
+        source_files.sort()
+
+    seen_seqs = {}   # sequence -> (name, source_file) — dedup by sequence
+    for path in source_files:
+        with open(path, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                seq = row['Sequence'].strip()
+                name = row['Name'].strip()
+                if seq and seq not in seen_seqs:
+                    seen_seqs[seq] = (name, path)
+
+    sequences = [(name, seq) for seq, (name, _) in seen_seqs.items()]
+
+    if not csv_file:
+        print(f"Sources loaded: {source_files}")
+        print(f"  Total unique sequences: {len(sequences)}")
+
     return sequences
 
 def calculate_binding_score(sequence: str) -> float:
@@ -259,45 +288,8 @@ def rank_sequences(sequences: List[Tuple[str, str]]) -> List[Tuple[str, str, flo
     return ranked_sequences
 
 def optimize_final_selection(ranked_sequences: List, target_count: int = 100) -> List:
-    """Optimize final selection for diversity and quality"""
-
-    final_selection = []
-    scaffold_counts = {'loop_rich': 0, 'helical': 0, 'beta_sheet': 0, 'mixed': 0}
-    scaffold_limits = {'loop_rich': 35, 'helical': 30, 'beta_sheet': 25, 'mixed': 10}
-
-    # First pass: select top sequences while maintaining scaffold diversity
-    for seq_data in ranked_sequences:
-        name, sequence, composite_score, scores = seq_data
-
-        # Determine scaffold type
-        if 'loop_rich' in name:
-            scaffold_type = 'loop_rich'
-        elif 'helical' in name:
-            scaffold_type = 'helical'
-        elif 'beta_sheet' in name:
-            scaffold_type = 'beta_sheet'
-        elif 'mixed' in name:
-            scaffold_type = 'mixed'
-        else:
-            scaffold_type = 'loop_rich'  # Default
-
-        # Add if under limit and total under target
-        if (len(final_selection) < target_count and
-            scaffold_counts[scaffold_type] < scaffold_limits[scaffold_type]):
-            final_selection.append(seq_data)
-            scaffold_counts[scaffold_type] += 1
-
-    # Second pass: fill remaining slots with best available
-    remaining_slots = target_count - len(final_selection)
-    remaining_sequences = [seq for seq in ranked_sequences if seq not in final_selection]
-
-    for seq_data in remaining_sequences:
-        if remaining_slots <= 0:
-            break
-        final_selection.append(seq_data)
-        remaining_slots -= 1
-
-    return final_selection[:target_count]
+    """Select top sequences purely by composite score — no diversity caps."""
+    return ranked_sequences[:target_count]
 
 def create_submission_files(final_sequences: List, prefix: str = "final_rbx1_submission"):
     """Create final submission files"""
@@ -337,8 +329,8 @@ def create_submission_files(final_sequences: List, prefix: str = "final_rbx1_sub
 if __name__ == "__main__":
     print("Analyzing and ranking RBX-1 binder sequences...")
 
-    # Load sequences
-    sequences = load_sequences('rbx1_binder_submission.csv')
+    # Load and merge all rbx1_*.csv source files
+    sequences = load_sequences()
     print(f"Loaded {len(sequences)} sequences")
 
     # Rank sequences
