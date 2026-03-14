@@ -1,0 +1,6 @@
+- inference.input_pdb=/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/targets/rbx1_1LDJ.pdb
+- contigmap.contigs=[B19-106/0 50-80]
+- ppi.hotspot_res=[B30,B33,B36,B60,B64,B68,B72,B85,B103]
+- inference.num_designs=50
+- inference.output_prefix=/home/on/rfdiff_outputs/rbx1_binder
+- inference.model_directory_path=/home/on/RFdiffusion/models
