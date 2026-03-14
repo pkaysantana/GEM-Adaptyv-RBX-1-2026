@@ -57,74 +57,87 @@ if not pdb_files:
 
 MPNN_OUT.mkdir(parents=True, exist_ok=True)
 
-# ─── Build chain-fix JSON for ProteinMPNN ────────────────────────────────────
-# Fix chain B (RBX-1), design chain A (binder)
-jsonl_path = MPNN_OUT / 'chain_fix.jsonl'
-with jsonl_path.open('w') as jf:
-    for pdb in pdb_files:
-        entry = {'A': [], 'B': list(range(1, 200))}  # fix all of B
-        jf.write(json.dumps({str(pdb): entry}) + '\n')
+# ─── Step 1: Parse PDBs to JSONL format ─────────────────────────────────────
+pdb_dir    = RFDIFF_OUT  # directory containing the 50 PDBs
+parsed_dir = MPNN_OUT / 'parsed_pdbs'
+parsed_dir.mkdir(exist_ok=True)
 
-flush(f"Wrote chain fix JSONL: {jsonl_path}")
+flush("Parsing PDBs to JSONL...")
+result = subprocess.run([
+    'python', str(MPNN_HELPER / 'parse_multiple_chains.py'),
+    '--input_path',  str(pdb_dir),
+    '--output_path', str(parsed_dir),
+], capture_output=True, text=True)
+if result.returncode != 0:
+    flush(f"  parse error: {result.stderr[-300:]}")
+    sys.exit(1)
 
-# ─── Run ProteinMPNN for each temperature ────────────────────────────────────
+parsed_jsonl = parsed_dir / 'parsed_pdbs.jsonl'
+flush(f"  Parsed JSONL: {parsed_jsonl}")
+
+# ─── Step 2: Assign fixed chains (fix chain B = RBX-1) ──────────────────────
+chain_jsonl = MPNN_OUT / 'chain_fix.jsonl'
+result = subprocess.run([
+    'python', str(MPNN_HELPER / 'assign_fixed_chains.py'),
+    '--input_path',  str(parsed_jsonl),
+    '--output_path', str(chain_jsonl),
+    '--chain_list',  'B',   # fix chain B (RBX-1), design chain A (binder)
+], capture_output=True, text=True)
+if result.returncode != 0:
+    flush(f"  chain assign error: {result.stderr[-300:]}")
+    sys.exit(1)
+flush(f"  Chain fix JSONL: {chain_jsonl}")
+
+# ─── Step 3: Run ProteinMPNN for each temperature ────────────────────────────
 all_seqs = []
 for T in TEMPS:
-    out_label = f'rfdiff_T{str(T).replace(".", "")}'
-    out_dir   = MPNN_OUT / out_label
+    out_dir = MPNN_OUT / f'rfdiff_T{str(T).replace(".", "")}'
     out_dir.mkdir(exist_ok=True)
 
     cmd = [
         'python', str(MPNN_SCRIPT),
-        '--pdb_path_multi',    str(jsonl_path),
-        '--out_folder',        str(out_dir),
+        '--jsonl_path',         str(parsed_jsonl),
+        '--chain_id_jsonl',     str(chain_jsonl),
+        '--out_folder',         str(out_dir),
         '--num_seq_per_target', str(N_PER_TEMP),
-        '--sampling_temp',     str(T),
-        '--batch_size',        '1',
-        '--score_only',        '0',
-        '--model_name',        'v_48_020',
+        '--sampling_temp',      str(T),
+        '--batch_size',         '1',
+        '--model_name',         'v_48_020',
     ]
     flush(f"\nRunning ProteinMPNN T={T}...")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         flush(f"  ERROR: {result.stderr[-500:]}")
         continue
+    flush(f"  Done T={T}")
 
-    # Parse FASTA outputs — only take chain A (binder) sequences
+    # Parse FASTA outputs — chain A (binder) is first in the slash-separated sequence
     for fa in (out_dir / 'seqs').glob('*.fa'):
         header, seq_parts = '', []
         for line in fa.read_text().splitlines():
             if line.startswith('>'):
                 if seq_parts and 'score=' in header:
-                    # parse score from header
                     try:
                         score = float([p for p in header.split(',') if 'score=' in p][0].split('=')[1])
                     except:
                         score = 0.0
                     seq = ''.join(seq_parts)
-                    # ProteinMPNN outputs full complex sequence; chain A comes first
-                    # Split by / to get individual chain sequences
-                    chains = seq.split('/')
-                    if chains:
-                        binder = chains[0]
-                        all_seqs.append({'sequence': binder, 'score': score,
-                                         'source': f'rfdiff_{fa.stem}_T{T}'})
+                    binder = seq.split('/')[0]  # chain A comes first
+                    all_seqs.append({'sequence': binder, 'score': score,
+                                     'source': f'rfdiff_{fa.stem}_T{T}'})
                 header = line[1:]
                 seq_parts = []
             else:
                 seq_parts.append(line.strip())
-        # last record
         if seq_parts and 'score=' in header:
             try:
                 score = float([p for p in header.split(',') if 'score=' in p][0].split('=')[1])
             except:
                 score = 0.0
             seq = ''.join(seq_parts)
-            chains = seq.split('/')
-            if chains:
-                binder = chains[0]
-                all_seqs.append({'sequence': binder, 'score': score,
-                                 'source': f'rfdiff_{fa.stem}_T{T}'})
+            binder = seq.split('/')[0]
+            all_seqs.append({'sequence': binder, 'score': score,
+                             'source': f'rfdiff_{fa.stem}_T{T}'})
 
 flush(f"\nCollected {len(all_seqs)} raw RFdiffusion+MPNN sequences")
 
