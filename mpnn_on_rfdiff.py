@@ -58,21 +58,18 @@ if not pdb_files:
 MPNN_OUT.mkdir(parents=True, exist_ok=True)
 
 # ─── Step 1: Parse PDBs to JSONL format ─────────────────────────────────────
-pdb_dir    = RFDIFF_OUT  # directory containing the 50 PDBs
-parsed_dir = MPNN_OUT / 'parsed_pdbs'
-parsed_dir.mkdir(exist_ok=True)
+pdb_dir      = RFDIFF_OUT  # directory containing the 50 PDBs
+parsed_jsonl = MPNN_OUT / 'parsed_pdbs.jsonl'
 
 flush("Parsing PDBs to JSONL...")
 result = subprocess.run([
     'python', str(MPNN_HELPER / 'parse_multiple_chains.py'),
     '--input_path',  str(pdb_dir),
-    '--output_path', str(parsed_dir),
+    '--output_path', str(parsed_jsonl),   # file path, not directory
 ], capture_output=True, text=True)
 if result.returncode != 0:
     flush(f"  parse error: {result.stderr[-300:]}")
     sys.exit(1)
-
-parsed_jsonl = parsed_dir / 'parsed_pdbs.jsonl'
 flush(f"  Parsed JSONL: {parsed_jsonl}")
 
 # ─── Step 2: Assign fixed chains (fix chain B = RBX-1) ──────────────────────
