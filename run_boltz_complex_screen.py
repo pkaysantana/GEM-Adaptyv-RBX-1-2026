@@ -39,11 +39,12 @@ RBX1_SEQ = (
 
 # Default candidates: top 5 from ESMFold monomer screen
 DEFAULT_CANDIDATES = [
-    "rbx1_binder_7_T02_s4",
-    "rbx1_binder_7_T02_s2",
-    "rbx1_binder_7_T03_s5",
-    "rbx1_binder_25_T03_s1",
-    "rbx1_binder_11_T03_s5",
+    # Tier-2 screen — backbone diversity across binder_31, binder_44, binder_15
+    "rbx1_binder_31_T01_s2",   # best monomer pLDDT from binder_31 (89.0×)
+    "rbx1_binder_31_T02_s2",   # cleanest min pLDDT in binder_31 (min=70), different temp
+    "rbx1_binder_44_T02_s4",   # best of binder_44 backbone (distinct structure)
+    "rbx1_binder_44_T03_s5",   # second binder_44 — covers backbone with two variants
+    "rbx1_binder_15_T03_s1",   # unique binder_15 backbone, only representative
 ]
 
 # Source of truth: the filtered ESMFold-scored CSV
