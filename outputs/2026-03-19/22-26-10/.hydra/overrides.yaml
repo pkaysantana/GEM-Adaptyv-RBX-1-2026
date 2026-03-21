@@ -1,0 +1,8 @@
+- inference.input_pdb=/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/targets/rbx1_1LDJ.pdb
+- inference.output_prefix=/home/on/rfdiff_outputs_v2/rbx1_binder
+- inference.num_designs=100
+- inference.model_directory_path=/home/on/RFdiffusion/models
+- contigmap.contigs=[B19-106/0 55-75]
+- ppi.hotspot_res=[B30,B33,B36,B60,B64,B68,B72,B85,B103]
+- denoiser.noise_scale_ca=1
+- denoiser.noise_scale_frame=1
