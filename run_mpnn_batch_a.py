@@ -51,8 +51,8 @@ def is_sane(seq: str) -> tuple[bool, list[str]]:
     if n < 50 or n > 80:
         reasons.append(f"length={n}")
 
-    if n > 0 and max(seq.count(aa) for aa in "ACDEFGHIKLMNPQRSTVWY") / n > 0.20:
-        reasons.append("single_aa_dominance>20%")
+    if n > 0 and max(seq.count(aa) for aa in "ACDEFGHIKLMNPQRSTVWY") / n > 0.30:
+        reasons.append("single_aa_dominance>30%")
 
     charged_pos = ((seq.count("R") + seq.count("K")) / n) if n > 0 else 0.0
     if charged_pos > 0.25:
@@ -214,6 +214,9 @@ def emit_record(
     seq_parts: list[str],
 ) -> None:
     if not header or not seq_parts:
+        return
+    # Skip the native-sequence reference entry (sample=0, all-G backbone)
+    if extract_sample_number(header) == 0:
         return
     raw    = "".join(seq_parts)
     binder = raw.split("/")[0]  # chain A is first slash-delimited segment

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 First-pass ESMFold monomer screening using HuggingFace EsmForProteinFolding.
-Reads rbx1_rfdiff_mpnn_filtered.csv, folds each binder, extracts pLDDT.
+Reads rbx1_rfdiff_mpnn_v2_filtered.csv, folds each binder, extracts pLDDT.
 """
 import csv
 import os
@@ -9,9 +9,9 @@ import sys
 import torch
 from collections import Counter
 
-FILT_CSV  = "/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/rbx1_rfdiff_mpnn_filtered.csv"
-OUT_DIR   = "/home/on/esmfold_rfdiff_passing"
-SCORE_CSV = "/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/rbx1_rfdiff_esmfold_scores.csv"
+FILT_CSV  = "/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/rbx1_rfdiff_mpnn_v2_filtered.csv"
+OUT_DIR   = "/home/on/esmfold_rfdiff_v2_passing"
+SCORE_CSV = "/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026/rbx1_rfdiff_esmfold_v2_scores.csv"
 HF_MODEL  = "facebook/esmfold_v1"
 
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -165,9 +165,13 @@ for r in sorted(ok, key=lambda x: -x["mean_plddt"]):
           f"{r['max_plddt']:>6.1f}  {r['temperature']}")
 
 print("\n== Threshold summary =================================================")
-for thresh in [70, 60, 50]:
+for thresh in [80, 70, 60, 50]:
     n = sum(1 for r in ok if r["mean_plddt"] >= thresh)
     print(f"  mean pLDDT >= {thresh}: {n}/{len(ok)}")
+
+# Gate used for downstream screening
+gate = [r for r in ok if r["mean_plddt"] >= 70 and r["min_plddt"] >= 55]
+print(f"\n  GATE (mean>=70 AND min>=55): {len(gate)}/{len(ok)}")
 
 print("\n== Distribution =======================================================")
 temp_pass = Counter(r["temperature"] for r in ok)
