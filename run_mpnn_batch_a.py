@@ -9,284 +9,344 @@ Writes:  /home/on/mpnn_on_rfdiff_v2/         (MPNN outputs)
 
 Does NOT merge with old submission or any previous CSV.
 Chain convention: A = binder (design), B = RBX1 (fixed).
-Temperatures: 0.1, 0.2, 0.3 x N_PER_TEMP seqs = 15 per backbone.
-Resume-safe: skips temperatures whose output is already complete.
+Temperatures: 0.1, 0.2, 0.3 x 5 seqs = 15 per backbone -> 1500 raw.
+Skips any temperature whose seqs/ directory already has one FASTA per backbone.
 """
 
+from __future__ import annotations
+
 import csv
-import json
 import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 
+
 # ── paths ─────────────────────────────────────────────────────────────────────
-PYTHON      = '/home/on/miniforge3/envs/protein-design/bin/python'
-RFDIFF_OUT  = Path('/home/on/rfdiff_outputs_v2')
-MPNN_DIR    = Path('/home/on/ProteinMPNN')
-MPNN_SCRIPT = MPNN_DIR / 'protein_mpnn_run.py'
-MPNN_HELPER = MPNN_DIR / 'helper_scripts'
-MPNN_OUT    = Path('/home/on/mpnn_on_rfdiff_v2')
-PROJECT     = Path('/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026')
-RAW_CSV     = PROJECT / 'rbx1_rfdiff_mpnn_v2.csv'
-FILT_CSV    = PROJECT / 'rbx1_rfdiff_mpnn_v2_filtered.csv'
+PYTHON      = "/home/on/miniforge3/envs/protein-design/bin/python"
+RFDIFF_OUT  = Path("/home/on/rfdiff_outputs_v2")
+MPNN_DIR    = Path("/home/on/ProteinMPNN")
+MPNN_SCRIPT = MPNN_DIR / "protein_mpnn_run.py"
+MPNN_HELPER = MPNN_DIR / "helper_scripts"
+MPNN_OUT    = Path("/home/on/mpnn_on_rfdiff_v2")
 
-TEMPS       = [0.1, 0.2, 0.3]
-N_PER_TEMP  = 5       # sequences per backbone per temperature
-N_BACKBONES = 100     # expected number of backbone PDBs
+PROJECT     = Path("/mnt/c/Users/Don/GEM-Adaptyv-RBX-1 2026/GEM-Adaptyv-RBX-1-2026")
+RAW_CSV     = PROJECT / "rbx1_rfdiff_mpnn_v2.csv"
+FILT_CSV    = PROJECT / "rbx1_rfdiff_mpnn_v2_filtered.csv"
 
-def flush(msg): print(msg, flush=True)
+TEMPS            = [0.1, 0.2, 0.3]
+N_PER_TEMP       = 5
+EXPECTED_BACKBONES = 100
+
+
+def flush(msg: str) -> None:
+    print(msg, flush=True)
 
 
 # ── biophysical filter ────────────────────────────────────────────────────────
 def is_sane(seq: str) -> tuple[bool, list[str]]:
-    """Return (passes, reason_list). Reasons include numeric context."""
     n = len(seq)
-    reasons = []
+    reasons: list[str] = []
+
     if n < 50 or n > 80:
-        reasons.append(f'length={n}')
-    if n > 0:
-        max_single = max(seq.count(aa) for aa in 'ACDEFGHIKLMNPQRSTVWY') / n
-        if max_single > 0.20:
-            reasons.append(f'single_aa_dominance={max_single:.2f}')
-        pos_frac = (seq.count('R') + seq.count('K')) / n
-        if pos_frac > 0.25:
-            reasons.append(f'pos_charge={pos_frac:.2f}')
-        aro_frac = (seq.count('F') + seq.count('W') + seq.count('Y')) / n
-        if aro_frac > 0.25:
-            reasons.append(f'aromatic={aro_frac:.2f}')
-        pro_frac = seq.count('P') / n
-        if pro_frac > 0.12:
-            reasons.append(f'pro_frac={pro_frac:.2f}')
-    net = (seq.count('K') + seq.count('R')) - (seq.count('D') + seq.count('E'))
+        reasons.append(f"length={n}")
+
+    if n > 0 and max(seq.count(aa) for aa in "ACDEFGHIKLMNPQRSTVWY") / n > 0.20:
+        reasons.append("single_aa_dominance>20%")
+
+    charged_pos = ((seq.count("R") + seq.count("K")) / n) if n > 0 else 0.0
+    if charged_pos > 0.25:
+        reasons.append(f"pos_charge={charged_pos:.2f}")
+
+    aromatic = ((seq.count("F") + seq.count("W") + seq.count("Y")) / n) if n > 0 else 0.0
+    if aromatic > 0.25:
+        reasons.append(f"aromatic={aromatic:.2f}")
+
+    net = (seq.count("K") + seq.count("R")) - (seq.count("D") + seq.count("E"))
     if abs(net) > 8:
-        reasons.append(f'net_charge={net}')
-    return len(reasons) == 0, reasons
+        reasons.append(f"net_charge={net}")
+
+    pro_frac = (seq.count("P") / n) if n > 0 else 0.0
+    if pro_frac > 0.12:
+        reasons.append(f"pro_frac={pro_frac:.2f}")
+
+    return (len(reasons) == 0), reasons
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-def count_backbone_pdbs() -> int:
-    return len(list(RFDIFF_OUT.glob('rbx1_binder_*.pdb')))
+def find_backbone_pdbs() -> list[Path]:
+    pdb_files = sorted(
+        RFDIFF_OUT.glob("rbx1_binder_*.pdb"),
+        key=lambda p: int(p.stem.split("_")[-1]),
+    )
+    flush(f"Found {len(pdb_files)} Batch A backbone PDBs in {RFDIFF_OUT}")
 
-def jsonl_is_fresh(jsonl_path: Path, expected_n: int) -> bool:
-    """True if JSONL exists and contains exactly expected_n entries."""
-    if not jsonl_path.exists():
-        return False
-    try:
-        count = sum(1 for line in jsonl_path.open() if line.strip())
-        return count == expected_n
-    except OSError:
-        return False
+    if not pdb_files:
+        sys.exit("ERROR: No PDBs found.")
 
-def temperature_is_complete(seqs_dir: Path, expected_fastas: int,
-                             expected_seqs_per_fasta: int) -> bool:
-    """True if seqs_dir has the right number of FASTAs and each has
-    at least expected_seqs_per_fasta sequences (headers)."""
-    if not seqs_dir.exists():
-        return False
-    fas = list(seqs_dir.glob('*.fa'))
-    if len(fas) < expected_fastas:
-        return False
-    # Spot-check: count '>' lines in the first and last FASTA
-    for fa in [fas[0], fas[-1]]:
-        headers = sum(1 for l in fa.open() if l.startswith('>'))
-        # MPNN writes 1 reference + N_PER_TEMP designed; total >= N_PER_TEMP + 1
-        if headers < expected_seqs_per_fasta + 1:
-            return False
-    return True
+    if len(pdb_files) != EXPECTED_BACKBONES:
+        flush(
+            f"WARNING: expected {EXPECTED_BACKBONES} backbones, found {len(pdb_files)}. "
+            "Using discovered count."
+        )
 
-def parse_fasta_file(fa: Path, backbone_id: str, tag: str) -> list[dict]:
-    """Parse one ProteinMPNN FASTA; return list of binder sequence records.
-    Skips the first (all-G reference) sequence.
-    """
-    records = []
-    header, seq_parts = '', []
-
-    def flush_record():
-        if not header or not seq_parts:
-            return
-        raw    = ''.join(seq_parts)
-        binder = raw.split('/')[0]
-        score, global_score, snum = 0.0, 0.0, 0
-        for tok in header.split(','):
-            tok = tok.strip()
-            if tok.startswith('score='):
-                try: score = float(tok.split('=')[1])
-                except ValueError: pass
-            if tok.startswith('global_score='):
-                try: global_score = float(tok.split('=')[1])
-                except ValueError: pass
-            if tok.startswith('sample='):
-                try: snum = int(tok.split('=')[1])
-                except ValueError: pass
-        # Skip the all-G reference sequence (sample 0 / reference)
-        if snum == 0 and set(binder.replace('/', '')) <= {'G', '/'}:
-            return
-        records.append({
-            'backbone_id':           backbone_id,
-            'temperature':           tag,
-            'binder_chain_sequence': binder,
-            'binder_length':         len(binder),
-            'mpnn_score':            round(score, 4),
-            'global_score':          round(global_score, 4),
-            'sample_number':         snum,
-        })
-
-    for line in fa.read_text().splitlines():
-        if line.startswith('>'):
-            flush_record()
-            header    = line[1:]
-            seq_parts = []
-        else:
-            seq_parts.append(line.strip())
-    flush_record()
-    return records
+    return pdb_files
 
 
-# ── find PDBs ─────────────────────────────────────────────────────────────────
-n_pdbs = count_backbone_pdbs()
-flush(f"Found {n_pdbs} Batch A backbone PDBs in {RFDIFF_OUT}")
-if n_pdbs == 0:
-    sys.exit("ERROR: No PDBs found.")
-if n_pdbs != N_BACKBONES:
-    flush(f"WARNING: expected {N_BACKBONES} PDBs, found {n_pdbs}. "
-          f"Proceeding with {n_pdbs}.")
-    actual_backbones = n_pdbs
-else:
-    actual_backbones = N_BACKBONES
+def run_checked(cmd: list[str], label: str) -> None:
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        sys.exit(f"{label} failed:\n{stderr[-500:]}")
 
-MPNN_OUT.mkdir(parents=True, exist_ok=True)
 
-# ── step 1+2: parse PDBs to JSONL (skip only if fresh) ───────────────────────
-parsed_jsonl = MPNN_OUT / 'parsed_pdbs.jsonl'
-chain_jsonl  = MPNN_OUT / 'chain_fix.jsonl'
+def ensure_jsonl_files() -> tuple[Path, Path]:
+    parsed_jsonl = MPNN_OUT / "parsed_pdbs.jsonl"
+    chain_jsonl  = MPNN_OUT / "chain_fix.jsonl"
 
-if jsonl_is_fresh(parsed_jsonl, actual_backbones) and chain_jsonl.exists():
-    flush(f"Step 1+2: JSONL files present and match {actual_backbones} backbones — skipping.")
-else:
-    flush("Step 1: Parsing PDBs to JSONL...")
-    r = subprocess.run([
-        PYTHON, str(MPNN_HELPER / 'parse_multiple_chains.py'),
-        '--input_path',  str(RFDIFF_OUT),
-        '--output_path', str(parsed_jsonl),
-    ], capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit(f"parse_multiple_chains failed:\n{r.stderr[-500:]}")
+    if parsed_jsonl.exists() and chain_jsonl.exists():
+        flush("\nStep 1+2: JSONL files already exist — skipping rebuild.")
+        flush(f"  -> {parsed_jsonl}")
+        flush(f"  -> {chain_jsonl}")
+        return parsed_jsonl, chain_jsonl
+
+    flush("\nStep 1: Parsing PDBs to JSONL...")
+    run_checked(
+        [
+            PYTHON,
+            str(MPNN_HELPER / "parse_multiple_chains.py"),
+            "--input_path",  str(RFDIFF_OUT),
+            "--output_path", str(parsed_jsonl),
+        ],
+        "parse_multiple_chains",
+    )
     flush(f"  -> {parsed_jsonl}")
 
     flush("Step 2: Assigning fixed chains (B = RBX1)...")
-    r = subprocess.run([
-        PYTHON, str(MPNN_HELPER / 'assign_fixed_chains.py'),
-        '--input_path',  str(parsed_jsonl),
-        '--output_path', str(chain_jsonl),
-        '--chain_list',  'B',
-    ], capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit(f"assign_fixed_chains failed:\n{r.stderr[-500:]}")
+    run_checked(
+        [
+            PYTHON,
+            str(MPNN_HELPER / "assign_fixed_chains.py"),
+            "--input_path",  str(parsed_jsonl),
+            "--output_path", str(chain_jsonl),
+            "--chain_list",  "A",
+        ],
+        "assign_fixed_chains",
+    )
     flush(f"  -> {chain_jsonl}")
 
-# ── step 3: run ProteinMPNN per temperature (skip if complete) ────────────────
-flush("\nStep 3: Running ProteinMPNN...")
-for T in TEMPS:
-    tag      = f'T{str(T).replace(".", "")}'
+    return parsed_jsonl, chain_jsonl
+
+
+def temp_tag(temp: float) -> str:
+    return f"T{str(temp).replace('.', '')}"
+
+
+def run_mpnn_temperature(
+    temp: float,
+    parsed_jsonl: Path,
+    chain_jsonl: Path,
+    expected_fastas: int,
+) -> None:
+    tag      = temp_tag(temp)
     out_dir  = MPNN_OUT / tag
-    out_dir.mkdir(exist_ok=True)
-    seqs_dir = out_dir / 'seqs'
+    seqs_dir = out_dir / "seqs"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    if temperature_is_complete(seqs_dir, actual_backbones, N_PER_TEMP):
-        n_fa = len(list(seqs_dir.glob('*.fa')))
-        flush(f"  T={T} ({tag}): complete ({n_fa} FASTAs verified) — skipping.")
-        continue
+    existing_fastas = sorted(seqs_dir.glob("*.fa")) if seqs_dir.exists() else []
+    if len(existing_fastas) >= expected_fastas:
+        flush(f"  T={temp} ({tag}): already complete ({len(existing_fastas)} FASTAs) — skipping.")
+        return
 
-    flush(f"  T={T} ({tag}): running ProteinMPNN on {actual_backbones} backbones...")
-    r = subprocess.run([
-        PYTHON, str(MPNN_SCRIPT),
-        '--jsonl_path',         str(parsed_jsonl),
-        '--chain_id_jsonl',     str(chain_jsonl),
-        '--out_folder',         str(out_dir),
-        '--num_seq_per_target', str(N_PER_TEMP),
-        '--sampling_temp',      str(T),
-        '--batch_size',         '1',
-        '--model_name',         'v_48_020',
-    ], capture_output=True, text=True)
-    if r.returncode != 0:
-        flush(f"  T={T} ERROR:\n{r.stderr[-400:]}")
-        continue
-    n_fa = len(list(seqs_dir.glob('*.fa'))) if seqs_dir.exists() else 0
-    flush(f"  T={T} ({tag}): done — {n_fa} FASTA files written.")
+    flush(f"  T={temp} ({tag}): running MPNN...")
+    result = subprocess.run(
+        [
+            PYTHON,
+            str(MPNN_SCRIPT),
+            "--jsonl_path",         str(parsed_jsonl),
+            "--chain_id_jsonl",     str(chain_jsonl),
+            "--out_folder",         str(out_dir),
+            "--num_seq_per_target", str(N_PER_TEMP),
+            "--sampling_temp",      str(temp),
+            "--batch_size",         "1",
+            "--model_name",         "v_48_020",
+        ],
+        capture_output=True,
+        text=True,
+    )
 
-# ── step 4: parse all FASTA outputs ──────────────────────────────────────────
-flush("\nStep 4: Parsing FASTA outputs...")
-all_seqs: list[dict] = []
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        flush(f"  T={temp} ({tag}) ERROR: {stderr[-400:]}")
+        return
 
-for T in TEMPS:
-    tag      = f'T{str(T).replace(".", "")}'
-    seqs_dir = MPNN_OUT / tag / 'seqs'
+    done_fastas = len(list(seqs_dir.glob("*.fa"))) if seqs_dir.exists() else 0
+    flush(f"  T={temp} ({tag}): done — {done_fastas} FASTA files written.")
+
+
+def extract_score(header: str) -> float:
+    for tok in header.split(","):
+        tok = tok.strip()
+        if tok.startswith("score="):
+            try:
+                return float(tok.split("=", 1)[1])
+            except ValueError:
+                return 0.0
+    return 0.0
+
+
+def extract_sample_number(header: str) -> int:
+    for tok in header.split(","):
+        tok = tok.strip()
+        if tok.startswith("sample="):
+            try:
+                return int(tok.split("=", 1)[1])
+            except ValueError:
+                return 0
+    return 0
+
+
+def emit_record(
+    bucket: list[dict],
+    backbone_id: str,
+    tag: str,
+    header: str,
+    seq_parts: list[str],
+) -> None:
+    if not header or not seq_parts:
+        return
+    raw    = "".join(seq_parts)
+    binder = raw.split("/")[0]  # chain A is first slash-delimited segment
+    bucket.append(
+        {
+            "backbone_id":           backbone_id,
+            "temperature":           tag,
+            "binder_chain_sequence": binder,
+            "binder_length":         len(binder),
+            "mpnn_score":            round(extract_score(header), 4),
+            "sample_number":         extract_sample_number(header),
+        }
+    )
+
+
+def parse_temperature_fastas(temp: float) -> list[dict]:
+    tag      = temp_tag(temp)
+    seqs_dir = MPNN_OUT / tag / "seqs"
+
     if not seqs_dir.exists():
         flush(f"  {tag}: seqs/ not found — skipping.")
-        continue
+        return []
 
-    fas = sorted(seqs_dir.glob('*.fa'))
-    t_seqs = []
-    for fa in fas:
-        t_seqs.extend(parse_fasta_file(fa, fa.stem, tag))
-    all_seqs.extend(t_seqs)
+    records: list[dict] = []
+    fasta_files = sorted(seqs_dir.glob("*.fa"))
 
-    expected = actual_backbones * N_PER_TEMP
-    flush(f"  {tag}: {len(t_seqs)} sequences parsed "
-          f"(expected ~{expected}, got {len(t_seqs)})")
+    for fa in fasta_files:
+        backbone_id = fa.stem
+        header      = ""
+        seq_parts: list[str] = []
 
-flush(f"\nTotal raw sequences: {len(all_seqs)}")
+        for line in fa.read_text().splitlines():
+            if line.startswith(">"):
+                emit_record(records, backbone_id, tag, header, seq_parts)
+                header    = line[1:]
+                seq_parts = []
+            else:
+                seq_parts.append(line.strip())
 
-if not all_seqs:
-    sys.exit("ERROR: No sequences parsed. Check MPNN outputs.")
+        emit_record(records, backbone_id, tag, header, seq_parts)  # flush last record
 
-# ── write raw CSV ─────────────────────────────────────────────────────────────
-raw_fields = ['backbone_id', 'temperature', 'binder_length', 'mpnn_score',
-              'global_score', 'sample_number', 'binder_chain_sequence']
-with RAW_CSV.open('w', newline='') as fh:
-    w = csv.DictWriter(fh, fieldnames=raw_fields, extrasaction='ignore')
-    w.writeheader()
-    w.writerows(all_seqs)
-flush(f"Raw CSV -> {RAW_CSV}  ({len(all_seqs)} sequences)")
+    flush(f"  {tag}: parsed {len(records)} sequences from {len(fasta_files)} FASTA files")
+    return records
 
-# ── step 5: biophysical filter ────────────────────────────────────────────────
-flush("\nStep 5: Biophysical filter...")
-passed: list[dict] = []
-failed: list[dict] = []
 
-for s in all_seqs:
-    ok, reasons = is_sane(s['binder_chain_sequence'])
-    entry = {**s, 'filter_reasons': 'PASS' if ok else '|'.join(reasons)}
-    (passed if ok else failed).append(entry)
+def write_raw_csv(rows: list[dict]) -> None:
+    fields = [
+        "backbone_id",
+        "temperature",
+        "binder_length",
+        "mpnn_score",
+        "sample_number",
+        "binder_chain_sequence",
+    ]
+    with RAW_CSV.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    flush(f"Raw CSV -> {RAW_CSV}  ({len(rows)} sequences)")
 
-total = len(all_seqs)
-pass_rate = len(passed) / total * 100 if total > 0 else 0.0
-flush(f"  Pass: {len(passed)}  Fail: {len(failed)}  ({pass_rate:.1f}% pass rate)")
 
-tc = Counter(s['temperature'] for s in passed)
-flush(f"  Passing by temperature: {dict(sorted(tc.items()))}")
+def write_filtered_csv(rows: list[dict]) -> None:
+    filt_fields = [
+        "sequence_id",
+        "backbone_id",
+        "temperature",
+        "binder_length",
+        "mpnn_score",
+        "sample_number",
+        "filter_reasons",
+        "binder_chain_sequence",
+    ]
+    with FILT_CSV.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=filt_fields, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            out = dict(row)
+            out["sequence_id"] = (
+                f"{row['backbone_id']}_{row['temperature']}_s{row['sample_number']}"
+            )
+            writer.writerow(out)
+    flush(f"Filtered CSV -> {FILT_CSV}  ({len(rows)} sequences)")
 
-lens = [s['binder_length'] for s in passed]
-if lens:
-    flush(f"  Length: min={min(lens)}  max={max(lens)}  "
-          f"mean={sum(lens)/len(lens):.1f} aa")
 
-bc = Counter(s['backbone_id'] for s in passed)
-flush(f"  Distinct backbones with >=1 passing sequence: {len(bc)}")
+def main() -> None:
+    pdb_files      = find_backbone_pdbs()
+    expected_fastas = len(pdb_files)
 
-# ── write filtered CSV ────────────────────────────────────────────────────────
-filt_fields = ['sequence_id', 'backbone_id', 'temperature', 'binder_length',
-               'mpnn_score', 'global_score', 'sample_number', 'filter_reasons',
-               'binder_chain_sequence']
-with FILT_CSV.open('w', newline='') as fh:
-    w = csv.DictWriter(fh, fieldnames=filt_fields, extrasaction='ignore')
-    w.writeheader()
-    for s in passed:
-        row = dict(s)
-        row['sequence_id'] = (f"{s['backbone_id']}_{s['temperature']}"
-                              f"_s{s['sample_number']}")
-        w.writerow(row)
+    MPNN_OUT.mkdir(parents=True, exist_ok=True)
 
-flush(f"Filtered CSV -> {FILT_CSV}  ({len(passed)} sequences)")
-flush("\nDone. Next step: run ESMFold screen on rbx1_rfdiff_mpnn_v2_filtered.csv")
+    parsed_jsonl, chain_jsonl = ensure_jsonl_files()
+
+    flush("\nStep 3: Running ProteinMPNN...")
+    for temp in TEMPS:
+        run_mpnn_temperature(temp, parsed_jsonl, chain_jsonl, expected_fastas)
+
+    flush("\nStep 4: Parsing FASTA outputs...")
+    all_seqs: list[dict] = []
+    for temp in TEMPS:
+        all_seqs.extend(parse_temperature_fastas(temp))
+
+    flush(f"\nTotal raw sequences collected: {len(all_seqs)}")
+    write_raw_csv(all_seqs)
+
+    flush("\nStep 5: Biophysical filter...")
+    passed: list[dict] = []
+    failed: list[dict] = []
+
+    for seq_row in all_seqs:
+        ok, reasons = is_sane(str(seq_row["binder_chain_sequence"]))
+        row = {
+            **seq_row,
+            "filter_reasons": "PASS" if ok else "|".join(reasons),
+        }
+        (passed if ok else failed).append(row)
+
+    total     = len(all_seqs)
+    pass_rate = (len(passed) / total * 100.0) if total else 0.0
+    flush(f"  Pass: {len(passed)}  Fail: {len(failed)}  ({pass_rate:.1f}% pass rate)")
+
+    by_temp = Counter(str(s["temperature"]) for s in passed)
+    flush(f"  By temperature: {dict(sorted(by_temp.items()))}")
+
+    lens = [int(s["binder_length"]) for s in passed]
+    if lens:
+        flush(f"  Length: min={min(lens)}  max={max(lens)}  mean={sum(lens)/len(lens):.1f}")
+
+    by_backbone = Counter(str(s["backbone_id"]) for s in passed)
+    flush(f"  Distinct backbones with >=1 passing sequence: {len(by_backbone)}")
+
+    write_filtered_csv(passed)
+    flush("\nDone. Next: run_esmfold_screen.py pointed at rbx1_rfdiff_mpnn_v2_filtered.csv")
+
+
+if __name__ == "__main__":
+    main()
