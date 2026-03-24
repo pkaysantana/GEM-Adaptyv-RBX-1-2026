@@ -23,9 +23,9 @@ I filtered candidate sequences using biophysical heuristics to remove designs un
 
 This stage reduced the pool from ~1,500 to 245 sequences across 62 unique backbones.
 
-## Monomer Structure Validation with ESMFold
+## Monomer Structure Prediction with ESMFold
 
-I evaluated the 245 filtered sequences for foldability using ESMFold (Lin et al., 2023), predicting monomer structures and computing per-residue pLDDT confidence scores. Sequences with mean pLDDT below 75 were discarded, retaining 59 candidates confidently predicted to fold into the intended backbone topology. Mean monomer pLDDT across the final 25 submissions was 87.6 (range: 75.0-93.7).
+I evaluated the 245 filtered sequences for predicted foldability using ESMFold (Lin et al., 2023), predicting monomer structures and computing per-residue pLDDT confidence scores. pLDDT is a model-based confidence metric that correlates with but does not guarantee correct folding. Sequences with mean pLDDT below 75 were discarded, retaining 59 candidates predicted to fold into the intended backbone topology. Mean monomer pLDDT across the final 25 submissions was 87.6 (range: 75.0-93.7).
 
 ## Complex Structure Prediction with Boltz-2
 
@@ -39,7 +39,7 @@ Predictions were run in three batches (initial + v2 batch 1 + v2 batch 2) totall
 
 ## Final Ranking and Selection
 
-I ranked the 25 validated binders by pair_iptm_AB (interface quality). The final submission includes all 25 designs spanning 18 unique backbone scaffolds. An additional 5 reserve candidates were held separately. Key statistics of the submitted designs:
+I ranked the 25 validated binders primarily by pair_iptm_AB (interface confidence), with monomer pLDDT and biophysical heuristics as secondary criteria. The final submission includes all 25 designs spanning 18 unique backbone scaffolds. An additional 5 reserve candidates were held separately. Key statistics of the submitted designs:
 
 | Metric | Min | Mean | Max |
 |--------|-----|------|-----|
