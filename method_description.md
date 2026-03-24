@@ -27,15 +27,15 @@ This stage reduced the pool from ~1,500 to 245 sequences across 62 unique backbo
 
 I evaluated the 245 filtered sequences for foldability using ESMFold (Lin et al., 2023), predicting monomer structures and computing per-residue pLDDT confidence scores. Sequences with mean pLDDT below 75 were discarded, retaining 59 candidates confidently predicted to fold into the intended backbone topology. Mean monomer pLDDT across the final 25 submissions was 87.6 (range: 75.0-93.7).
 
-## Complex Binding Validation with Boltz-2
+## Complex Structure Prediction with Boltz-2
 
-I assessed remaining candidates for RBX-1 binding using Boltz-2 (Wohlwend et al., 2025) complex structure prediction. Each binder-RBX1 pair was modelled as a two-chain complex, and I extracted interface-level metrics:
+I used Boltz-2 (Wohlwend et al., 2025) to predict binder-RBX1 complex structures as a model-based prioritisation step. Each binder-RBX1 pair was modelled as a two-chain complex, and I extracted interface-level metrics:
 
 - **pair_iptm_AB**: interface predicted TM-score between binder (chain A) and RBX-1 (chain B)
 - **complex pLDDT**: confidence of the predicted complex structure
 - **pLDDT delta**: change in binder confidence from monomer to complex context
 
-Predictions were run in three batches (initial + v2 batch 1 + v2 batch 2) totalling 37 complex predictions. I gated candidates on pair_iptm_AB > 0.65, yielding 25 designs that passed all validation stages.
+Predictions were run in three batches (initial + v2 batch 1 + v2 batch 2) totalling 37 complex predictions. I gated candidates on pair_iptm_AB > 0.65, yielding 25 designs that passed all stages. These scores reflect model confidence in the predicted interface, not experimental binding affinity; actual binding will be determined by wet-lab assay.
 
 ## Final Ranking and Selection
 
