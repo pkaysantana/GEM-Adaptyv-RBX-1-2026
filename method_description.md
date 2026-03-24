@@ -2,7 +2,7 @@
 
 ## Target and Structural Basis
 
-I designed de novo protein binders targeting RBX-1 (RING-box protein 1), a RING domain E3 ubiquitin ligase component involved in cullin-RING ligase complexes implicated in cancer biology. My designs target the CUL1-interacting surface of RBX-1, using the crystal structure of the CUL1-RBX1 complex (PDB: 1LDJ, 2.4 A) as the structural template. I selected hotspot residues on RBX-1 at the native protein-protein interface to define the binding site for scaffold generation.
+I designed protein binders targeting RBX-1 (RING-box protein 1), a RING domain E3 ubiquitin ligase component involved in cullin-RING ligase complexes implicated in cancer biology. All backbones were generated de novo by RFdiffusion (no motif scaffolding or lead optimisation from existing binders); I have not independently verified novelty by sequence search against UniRef50, but the designs are structurally novel by construction. My designs target the CUL1-interacting surface of RBX-1, using the crystal structure of the CUL1-RBX1 complex (PDB: 1LDJ, 2.4 A) as the structural template. I selected hotspot residues on RBX-1 at the native protein-protein interface to define the binding site for scaffold generation.
 
 ## Backbone Generation with RFdiffusion
 
